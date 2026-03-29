@@ -1,27 +1,22 @@
 import streamlit as st
 import google.generativeai as genai
 import random
+import os
+import time
 
-# Configure your Google Generative AI API key
-API_KEY = "AIzaSyD-EGqrpeudmbJVrGDwT9Mtd5NZpOWbCU8"  # Replace with your actual API key
-genai.configure(api_key=API_KEY)
+# ✅ Get API key from environment (SAFE)
+api_key = os.getenv("GEMINI_API_KEY")
 
-# Configure model generation settings
-generation_config = {
-    "temperature": 0.75,
-    "top_p": 0.95,
-    "top_k": 64,
-    "max_output_tokens": 8192,
-    "response_mime_type": "text/plain",
-}
+if not api_key:
+    st.error("API key not found! Please add it in Streamlit Secrets.")
+    st.stop()
 
-# Create the generative model instance
-model = genai.GenerativeModel(
-    model_name="gemini-1.5-pro",
-    generation_config=generation_config,
-)
+genai.configure(api_key=api_key)
 
-# Function to generate a joke
+# ✅ Use FREE model (important)
+model = genai.GenerativeModel("gemini-1.5-flash")
+
+# Joke function
 def get_joke():
     jokes = [
         "Why do programmers prefer dark mode? Because light attracts bugs!",
@@ -31,53 +26,47 @@ def get_joke():
     ]
     return random.choice(jokes)
 
-# Function to generate a blog
-def generate_blog(user_input, word_count):
+# Generate blog
+def generate_blog(topic, words):
     st.write("### ⏳ Generating Your Blog...")
-    st.write(f"🤖 Here's a joke while you wait:\n\n**{get_joke()}**")
+    st.write(f"🤖 Joke: **{get_joke()}**")
 
-    chat_session = model.start_chat(
-        history=[
-            {
-                "role": "user",
-                "parts": [
-                    f"Write a blog about: {user_input}, with {word_count} words.",
-                ],
-            },
-        ]
-    )
+    prompt = f"Write a blog about '{topic}' in {words} words."
 
     try:
-        # Generate a response
-        response = chat_session.send_message(user_input)
-        st.success("🎉 Your blog is ready!")
-        return response.text if response else "No response received."
+        time.sleep(2)  # prevent rate limit
+        response = model.generate_content(prompt)
+
+        if response and response.text:
+            st.success("🎉 Blog Ready!")
+            return response.text
+        else:
+            return "No content generated."
 
     except Exception as e:
-        st.error(f"❌ Error generating blog: {e}")
+        st.error(f"❌ Error: {e}")
         return None
 
-# Streamlit UI
+# UI
 def main():
-    st.title("📖 BlogMaster: AI-Powered Blog Generation")
+    st.title("📖 BlogMaster: AI Blog Generator")
 
-    # Display the second image at the top
-    st.image("edited_blog_master.jpg", use_container_width=True)  # ✅ Fixed error here
+    # Optional image
+    try:
+        st.image("edited_blog_master.jpg", use_container_width=True)
+    except:
+        pass
 
-    st.write("### 🤖 Hello! I'm BlogMaster. Let's create an amazing blog!")
-
-    # User inputs
-    user_input = st.text_input("Enter your blog topic:")
-    word_count = st.number_input("Number of words", min_value=100, max_value=5000, value=1000, step=50)
+    topic = st.text_input("Enter blog topic:")
+    words = st.number_input("Word count", 100, 5000, 500)
 
     if st.button("Generate Blog"):
-        if user_input and word_count:
-            blog_content = generate_blog(user_input, word_count)
-            if blog_content:
-                st.write("### 📝 Your AI-Generated Blog:")
-                st.write(blog_content)
+        if topic:
+            blog = generate_blog(topic, words)
+            if blog:
+                st.write(blog)
         else:
-            st.error("⚠️ Please enter both the topic and the number of words.")
+            st.warning("Please enter a topic")
 
 if __name__ == "__main__":
     main()
